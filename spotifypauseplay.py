@@ -4,8 +4,6 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from time import sleep
 from pycaw.pycaw import AudioUtilities
 
-#from spotifyAuth import (cid,csecret)
-
 sp = None
 stoken = None
 token = None
@@ -196,13 +194,11 @@ def OnKeyboardEvent(event):
             changing = False
         except spotipy.client.SpotifyException as e:
             apierrors(e,event,event.KeyID)
-    #return event.KeyID
     return True
     
 def apierrors(e,event,keyid):
     global stoken, play, changing, sp, devices, selecteDevice, deviceid
     
-    #print(e)
     e = str(e)
     hcode = (e[e.find(':')+1:e.find(',')]).strip()
     
