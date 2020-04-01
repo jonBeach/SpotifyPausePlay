@@ -1,8 +1,6 @@
 import requests, pythoncom, os, subprocess, spotipy, json, pyWinhook as pyHook, pathlib
-from pynput.keyboard import KeyCode, Key, Controller
+#from pynput.keyboard import KeyCode, Key, Controller
 from spotipy.oauth2 import SpotifyClientCredentials
-from time import sleep
-from pycaw.pycaw import AudioUtilities
 
 sp = None
 stoken = None
@@ -96,12 +94,11 @@ def getoauth():
     return token[0:(len(token))//2]
 print(getoauth())
 
-keyboard = Controller()
 play = True
 changing = False
 volume = 100
-
 deviceCount = 0
+
 def OnKeyboardEvent(event):
     global play, changing, sp, stoken, token, volume, devices, selecteDevice, deviceCount, deviceid
     if selecteDevice == True:
@@ -275,6 +272,5 @@ hm = pyHook.HookManager()
 hm.KeyDown = OnKeyboardEvent
 # set the hook
 hm.HookKeyboard()
-keyboard.press('a')
 # wait forever
 pythoncom.PumpMessages()
