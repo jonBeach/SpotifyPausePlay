@@ -24,7 +24,7 @@ def setup():
         username = input("Enter Username:")
         cid = input("Enter Client ID:")
         csecret = input("Enter Client Secret:")
-        deviceid = input("Enter device ID\n(You can enter nothing and it will automatically selecte a device for you\n \
+        deviceid = input("Enter device ID\n(You can enter nothing and it will automatically select a device for you\n \
         If you have spotify open on two different devices and neither is playing you will get an error and have to select a device but the program will help you with that!):")
         data = {}
         data.update({
