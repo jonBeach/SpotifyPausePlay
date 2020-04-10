@@ -1,6 +1,7 @@
 import requests, pythoncom, os, subprocess, spotipy, json, pyWinhook as pyHook, pathlib
-#from pynput.keyboard import KeyCode, Key, Controller
 from spotipy.oauth2 import SpotifyClientCredentials
+#from pynput.keyboard import KeyCode, Key, Controller
+#from time import sleep
 
 sp = None
 stoken = None
@@ -24,7 +25,7 @@ def setup():
         username = input("Enter Username:")
         cid = input("Enter Client ID:")
         csecret = input("Enter Client Secret:")
-        deviceid = input("Enter device ID\n(You can enter nothing and it will automatically select a device for you\n \
+        deviceid = input("Enter device ID\n(You can enter nothing and it will automatically selecte a device for you\n \
         If you have spotify open on two different devices and neither is playing you will get an error and have to select a device but the program will help you with that!):")
         data = {}
         data.update({
@@ -75,7 +76,8 @@ def checkcachefile():
 def getoauth():
     global sp, stoken, token, username, cid, csecret, path
     setup()
-    stoken = spotipy.oauth2.SpotifyOAuth(client_id=cid, client_secret=csecret, redirect_uri='http://localhost:8080', scope='user-modify-playback-state user-read-playback-state', username=username)
+    stoken = spotipy.oauth2.SpotifyOAuth(client_id=cid, client_secret=csecret, redirect_uri='http://localhost:8080', scope='user-modify-playback-state user-read-playback-state app-remote-control\
+    streaming', username=username)
     cacheExists = checkcachefile()
     if cacheExists == False:
         try:
@@ -92,15 +94,63 @@ def getoauth():
     sp = spotipy.Spotify(auth=token)
     tmp = subprocess.call('cls',shell=True)
     return token[0:(len(token))//2]
-print(getoauth())
+
+def GetDeviceList():
+    global stoken, play, changing, sp, devices, selecteDevice, deviceid
+    data = sp.devices()
+    devices = []
+    for key in data['devices']:
+        devices.append([key['name'],key['id']])
+    selecteDevice = True
+    tmp = subprocess.call('cls',shell=True)
+    if len(devices) == 0:
+        print("No Active Device Found, please open Spotify on a device!\nPress Enter too refresh!")
+    elif len(devices) == 1:
+        name, did = devices[0]
+        deviceid = did
+        tmp = subprocess.call('cls',shell=True)
+        print('Device Selected: Name: {0} ID: {1}'.format(name,did))
+        changing = False
+        print("Ready")
+    else:
+        print('\nSelect a device to play on (use arrow keys and enter)\n')
+        for device in devices:
+            name, did = device
+            if device == devices[0]:
+                print('>>> {0}'.format(name))
+            else:
+                print(name)
+
+def GetDeviceInfo(info):
+    global globals
+    deviceinfo = sp.current_playback()
+    deviceinfo = str(deviceinfo).replace("'", '"')
+    deviceinfo = str(deviceinfo).replace("False", '"False"')
+    deviceinfo = str(deviceinfo).replace("True", '"True"')
+    deviceinfo = str(deviceinfo).replace("None", '"None"')
+    
+    if deviceinfo == '"None"':
+        GetDeviceList()
+    else:
+        deviceinfo = json.loads(deviceinfo)
+        if info == "Start":
+            deviceid = deviceinfo['device']['id']
+            name = deviceinfo['device']['name']
+            print('Device Selected: Name: {0} ID: {1}'.format(name,deviceid))
+        elif info == "ID":
+            deviceid = deviceinfo['device']['id']
 
 play = True
 changing = False
 volume = 100
-deviceCount = 0
+getoauth()
+GetDeviceInfo("Start")
 
+deviceCount = 0
 def OnKeyboardEvent(event):
     global play, changing, sp, stoken, token, volume, devices, selecteDevice, deviceCount, deviceid
+    if devices != None and len(devices) == 0 and event.KeyID == 13 and selecteDevice == True: #Enter Key
+        GetDeviceList()
     if selecteDevice == True:
         if event.KeyID == 38: #up arrow
             if deviceCount > 0:
@@ -134,7 +184,7 @@ def OnKeyboardEvent(event):
                     print("Ready")
                     changing = False
                     break
-    if event.KeyID == 124 and changing == False: #F13 Key 124
+    if event.KeyID == 124 and changing == False: #F13 Key
         if play == True:
             changing = True
             try:
@@ -196,6 +246,7 @@ def OnKeyboardEvent(event):
 def apierrors(e,event,keyid):
     global stoken, play, changing, sp, devices, selecteDevice, deviceid
     
+    #print(e)
     e = str(e)
     hcode = (e[e.find(':')+1:e.find(',')]).strip()
     
@@ -218,43 +269,38 @@ def apierrors(e,event,keyid):
             OnKeyboardEvent(event)
     elif hcode == "403":
         if "Player command failed: Restriction violated" in e:
-            if keyid != 127:
-                ite = stoken.is_token_expired(stoken.get_cached_token())
-                play = not play
-                changing = False
-                OnKeyboardEvent(event)
-            else:
+            if keyid == 124:
+                teste = "".join(((e.replace(" ", "")).splitlines()))
+                if "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/play?" in teste or "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/pause?" in teste:
+                    GetDeviceList()
+                    ite = stoken.is_token_expired(stoken.get_cached_token())
+                    play = not play
+                    changing = False
+                    OnKeyboardEvent(event)
+                else:
+                    ite = stoken.is_token_expired(stoken.get_cached_token())
+                    play = not play
+                    changing = False
+                    OnKeyboardEvent(event)
+            elif keyid == 125:
+                print("Error Putting Volume Up")
+            elif keyid == 126:
+                print("Error Putting Volume Down")
+            elif keyid == 127:
                 print('No Previous Song (probably due to you being on shuffle)')
-                changing = False
+            elif keyid == 128:
+                print('Error Changing to Next Song!')
+            changing = False
     elif hcode == "404":
-        if "Player command failed: No active device found" in e or "Player command failed: Restriction violated" in e:
-            data = sp.devices()
-            devices = []
-            for key in data['devices']:
-                devices.append([key['name'],key['id']])
-            selecteDevice = True
-            tmp = subprocess.call('cls',shell=True)
-            if len(devices) == 1:
-                name, did = devices[0]
-                deviceid = did
-                tmp = subprocess.call('cls',shell=True)
-                print('Device Selected: Name: {0} ID: {1}'.format(name,did))
-                changing = False
-                print("Ready")
-            else:
-                print('\nSelect a device to play on (use arrow keys and enter)\n')
-                for device in devices:
-                    name, did = device
-                    if device == devices[0]:
-                        print('>>> {0}'.format(name))
-                    else:
-                        print(name)
+        if "Player command failed: No active device found" in e or "Player command failed: Restriction violated" in e or "Device not found" in e:
+            GetDeviceList()
     elif hcode == "429":
         None
     elif hcode == "500":
-        None
+        print("500 - Error, I don't think i can fix this")
     elif hcode == "502":
-        None
+        if "Bad gateway." in e:
+            GetDeviceList()
     elif hcode == "503":
         None
     return
