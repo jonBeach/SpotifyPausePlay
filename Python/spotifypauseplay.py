@@ -51,6 +51,8 @@ def getinfo():
             deviceid = None
             
 def ConvertToJson(text, edit, number):
+    if text == "None":
+        return text
     if edit == True:
         if number == 1:
             totalcount = 0
@@ -165,6 +167,7 @@ def GetDeviceInfo(info):
             print('Device Selected: Name: {0} ID: {1}'.format(name,deviceid))
         elif info == "ID":
             deviceid = deviceinfo['device']['id']
+            return deviceid
 
 play = True
 changing = False
@@ -278,7 +281,7 @@ def OnKeyboardEvent(event):
 def apierrors(e,event,keyid):
     global stoken, play, changing, sp, devices, selecteDevice, deviceid, errorcount
     
-    print(e)
+    #print(e)
     e = str(e)
     hcode = (e[e.find(':')+1:e.find(',')]).strip()
     
@@ -303,31 +306,61 @@ def apierrors(e,event,keyid):
         if "Player command failed: Restriction violated" in e:
             if keyid == 124:
                 errorcount += 1
-                lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)))
-                lastsonguri = lastsonguri['items'][0]['track']['uri']
-                sp.start_playback(device_id=deviceid,context_uri=str(lastsonguri))
-                
                 teste = "".join(((e.replace(" ", "")).splitlines()))
                 if "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/play?" in teste or "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/pause?" in teste:
-                    GetDeviceList()
-                    ite = stoken.is_token_expired(stoken.get_cached_token())
-                    play = not play
-                    changing = False
-                    OnKeyboardEvent(event)
-                else:
                     if errorcount > 15:
-                        lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)))
+                        GetDeviceList()
+                        lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)),False,0)
                         lastsonguri = lastsonguri['items'][0]['track']['uri']
-                        
-                        if random.randint(1,2) == 1 or lastsonguri.strip() == "" or lastsonguri == None or lastsonguri == '"None"':
-                            sp.start_playback(device_id=deviceid,context_uri="spotify:track:0IH3D0P8OrQFs6ajcqbm0R")
+                        rannum = random.randint(1,7)
+                        if rannum < 5 or lastsonguri.strip() == "" or lastsonguri == None or lastsonguri == '"None"':
+                            sp.start_playback(device_id=deviceid,context_uri='spotify:playlist:02NrlaHwiz1FyqdR6wHLXl')
+                            errorcount = 0
+                            print(errorcount)
+                        elif rannum == 6:
+                            sp.start_playback(device_id=deviceid,uris=[lastsonguri])
+                            errorcount = 0
+                            print(errorcount)
                         else:
-                            sp.start_playback(device_id=deviceid,context_uri=lastsonguri)
+                            #sp.start_playback(device_id=deviceid,uris=["spotify:track:0IH3D0P8OrQFs6ajcqbm0R"])
+                            sp.start_playback(device_id=deviceid,context_uri='spotify:playlist:1d50HXU36BFMPk5rpMPUyF',offset={"position":580}) #579
+                            errorcount = 0
+                            print(errorcount)
+                        ite = stoken.is_token_expired(stoken.get_cached_token())
+                        play = False
+                        changing = False
+                        print('You Broke Spotify :(')
+                        print("Play")
+                        errorcount = 0
+                    else:
+                        deviceid = GetDeviceInfo("ID")
+                        #play = not play
+                        changing = False
+                        OnKeyboardEvent(event)
+                else:
+                    '''if errorcount > 15:
+                        lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)),False,0)
+                        lastsonguri = lastsonguri['items'][0]['track']['uri']
+                        rannum = random.randint(1,7)
+                        if rannum < 5 or lastsonguri.strip() == "" or lastsonguri == None or lastsonguri == '"None"':
+                            sp.start_playback(device_id=deviceid,context_uri='spotify:playlist:02NrlaHwiz1FyqdR6wHLXl')
+                        elif rannum == 6:
+                            sp.start_playback(device_id=deviceid,uris=[lastsonguri])
+                        else:
+                            sp.start_playback(device_id=deviceid,uris=["spotify:track:0IH3D0P8OrQFs6ajcqbm0R"])
+                        ite = stoken.is_token_expired(stoken.get_cached_token())
+                        play = not play
+                        changing = False
+                        print("Play")
                     else:
                         ite = stoken.is_token_expired(stoken.get_cached_token())
                         play = not play
                         changing = False
-                        OnKeyboardEvent(event)
+                        OnKeyboardEvent(event)'''
+                    ite = stoken.is_token_expired(stoken.get_cached_token())
+                    play = not play
+                    changing = False
+                    OnKeyboardEvent(event)
             elif keyid == 125:
                 print("Error Putting Volume Up")
             elif keyid == 126:
@@ -343,7 +376,10 @@ def apierrors(e,event,keyid):
     elif hcode == "429":
         None
     elif hcode == "500":
-        print("500 - Error, I don't think i can fix this")
+        print("500 - Error, I don't think i can fix this. There response to this error is...\nInternal Server Error. You should never receive this error because our\
+        clever coders catch them all …\
+        but if you are unlucky enough to get one, please report it to us through a comment at the bottom of this page.\
+        \nSo yea I don't know...")
     elif hcode == "502":
         if "Bad gateway." in e:
             GetDeviceList()
