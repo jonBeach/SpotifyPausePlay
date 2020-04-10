@@ -1,4 +1,4 @@
-import requests, pythoncom, os, subprocess, spotipy, json, pyWinhook as pyHook, pathlib
+import requests, pythoncom, os, subprocess, spotipy, json, pyWinhook as pyHook, pathlib, random
 from spotipy.oauth2 import SpotifyClientCredentials
 #from pynput.keyboard import KeyCode, Key, Controller
 #from time import sleep
@@ -13,6 +13,7 @@ filelist = None
 deviceid = None
 selecteDevice = False
 devices = None
+errorcount = 0
 path = pathlib.Path(__file__).parent.absolute()
 
 def setup():
@@ -48,6 +49,38 @@ def getinfo():
         deviceid = data['deviceid']
         if deviceid.strip() == "":
             deviceid = None
+            
+def ConvertToJson(text, edit, number):
+    if edit == True:
+        if number == 1:
+            totalcount = 0
+            count = 0
+            t1 = text.split()
+            for word in t1:
+                totalcount += 1
+                if word == "'name':":
+                    count += 1
+                if count == 7:
+                    newcount = totalcount    # THE FUCK IS THIS UGLY ASS CODE?!?!?!?
+                    newstring = ""
+                    oldstring = ""
+                    while t1[newcount] != "'popularity':":
+                        newstring += t1[newcount]+" "
+                        newcount += 1
+                    oldstring = newstring
+                    newstring = newstring.strip()
+                    newstring = newstring[1:(len(newstring))-2]
+                    if "'" in newstring or '"' in newstring:
+                        newstring = newstring.replace("'","")
+                        newstring = newstring.replace('"',"")
+                    text = text.replace(oldstring,('"'+newstring+'",'))
+                    break
+    text = text.replace("'",'"')
+    text = text.replace("False", '"False"')
+    text = text.replace("True", '"True"')
+    text = text.replace("None", '"None"')
+    text = json.loads(text)
+    return text
 
 def checkcachefile():
     global path, filelist
@@ -76,8 +109,7 @@ def checkcachefile():
 def getoauth():
     global sp, stoken, token, username, cid, csecret, path
     setup()
-    stoken = spotipy.oauth2.SpotifyOAuth(client_id=cid, client_secret=csecret, redirect_uri='http://localhost:8080', scope='user-modify-playback-state user-read-playback-state app-remote-control\
-    streaming', username=username)
+    stoken = spotipy.oauth2.SpotifyOAuth(client_id=cid, client_secret=csecret, redirect_uri='http://localhost:8080', scope='user-modify-playback-state user-read-playback-state user-read-recently-played', username=username)
     cacheExists = checkcachefile()
     if cacheExists == False:
         try:
@@ -123,16 +155,10 @@ def GetDeviceList():
 
 def GetDeviceInfo(info):
     global globals
-    deviceinfo = sp.current_playback()
-    deviceinfo = str(deviceinfo).replace("'", '"')
-    deviceinfo = str(deviceinfo).replace("False", '"False"')
-    deviceinfo = str(deviceinfo).replace("True", '"True"')
-    deviceinfo = str(deviceinfo).replace("None", '"None"')
-    
-    if deviceinfo == '"None"':
+    deviceinfo = ConvertToJson(str(sp.current_playback()),True,1)
+    if deviceinfo == '"None"' or deviceinfo == "None":
         GetDeviceList()
     else:
-        deviceinfo = json.loads(deviceinfo)
         if info == "Start":
             deviceid = deviceinfo['device']['id']
             name = deviceinfo['device']['name']
@@ -148,7 +174,7 @@ GetDeviceInfo("Start")
 
 deviceCount = 0
 def OnKeyboardEvent(event):
-    global play, changing, sp, stoken, token, volume, devices, selecteDevice, deviceCount, deviceid
+    global play, changing, sp, stoken, token, volume, devices, selecteDevice, deviceCount, deviceid, errorcount
     if devices != None and len(devices) == 0 and event.KeyID == 13 and selecteDevice == True: #Enter Key
         GetDeviceList()
     if selecteDevice == True:
@@ -192,6 +218,7 @@ def OnKeyboardEvent(event):
                 print('Play')
                 changing = False
                 play = False
+                errorcount = 0
             except spotipy.client.SpotifyException as e:
                 apierrors(e,event,event.KeyID)
         else:
@@ -201,6 +228,7 @@ def OnKeyboardEvent(event):
                 print('Pause')
                 changing = False
                 play = True
+                errorcount = 0
             except spotipy.client.SpotifyException as e:
                 apierrors(e,event,event.KeyID)
     if event.KeyID == 125: #F14 Key
@@ -211,6 +239,7 @@ def OnKeyboardEvent(event):
                 if volume > 100:
                     volume = 100
                 print('Volume Up: {0}'.format(volume))
+                errorcount = 0
             except spotipy.client.SpotifyException as e:
                 apierrors(e,event,event.KeyID)
     if event.KeyID == 126: #F15 Key
@@ -221,6 +250,7 @@ def OnKeyboardEvent(event):
                 if volume < 0:
                     volume = 0
                 print('Volume Down: {0}'.format(volume))
+                errorcount = 0
             except spotipy.client.SpotifyException as e:
                 apierrors(e,event,event.KeyID)
     if event.KeyID == 128 and changing == False: #F17 Key
@@ -230,6 +260,7 @@ def OnKeyboardEvent(event):
             print('Next Song')
             play = False
             changing = False
+            errorcount = 0
         except spotipy.client.SpotifyException as e:
             apierrors(e,event,event.KeyID)
     if event.KeyID == 127 and changing == False: #F16 Key
@@ -239,14 +270,15 @@ def OnKeyboardEvent(event):
             print('Previous Song')
             play = False
             changing = False
+            errorcount = 0
         except spotipy.client.SpotifyException as e:
             apierrors(e,event,event.KeyID)
     return True
     
 def apierrors(e,event,keyid):
-    global stoken, play, changing, sp, devices, selecteDevice, deviceid
+    global stoken, play, changing, sp, devices, selecteDevice, deviceid, errorcount
     
-    #print(e)
+    print(e)
     e = str(e)
     hcode = (e[e.find(':')+1:e.find(',')]).strip()
     
@@ -270,6 +302,11 @@ def apierrors(e,event,keyid):
     elif hcode == "403":
         if "Player command failed: Restriction violated" in e:
             if keyid == 124:
+                errorcount += 1
+                lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)))
+                lastsonguri = lastsonguri['items'][0]['track']['uri']
+                sp.start_playback(device_id=deviceid,context_uri=str(lastsonguri))
+                
                 teste = "".join(((e.replace(" ", "")).splitlines()))
                 if "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/play?" in teste or "httpstatus:403,code:-1-https://api.spotify.com/v1/me/player/pause?" in teste:
                     GetDeviceList()
@@ -278,10 +315,19 @@ def apierrors(e,event,keyid):
                     changing = False
                     OnKeyboardEvent(event)
                 else:
-                    ite = stoken.is_token_expired(stoken.get_cached_token())
-                    play = not play
-                    changing = False
-                    OnKeyboardEvent(event)
+                    if errorcount > 15:
+                        lastsonguri = ConvertToJson(str(sp.current_user_recently_played(limit=1)))
+                        lastsonguri = lastsonguri['items'][0]['track']['uri']
+                        
+                        if random.randint(1,2) == 1 or lastsonguri.strip() == "" or lastsonguri == None or lastsonguri == '"None"':
+                            sp.start_playback(device_id=deviceid,context_uri="spotify:track:0IH3D0P8OrQFs6ajcqbm0R")
+                        else:
+                            sp.start_playback(device_id=deviceid,context_uri=lastsonguri)
+                    else:
+                        ite = stoken.is_token_expired(stoken.get_cached_token())
+                        play = not play
+                        changing = False
+                        OnKeyboardEvent(event)
             elif keyid == 125:
                 print("Error Putting Volume Up")
             elif keyid == 126:
